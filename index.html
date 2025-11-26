@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oryap Puantaj Sistemi</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .card { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+        input, select { padding: 5px; margin: 5px; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+</head>
+<body>
+
+<h2>İşçi Ekle</h2>
+
+<form id="isciForm">
+    <input type="text" id="ad" placeholder="Ad Soyad" required>
+    <input type="number" id="yas" placeholder="Yaş" required>
+    <input type="text" id="meslek" placeholder="Meslek" required>
+    <button type="submit">İşçi Ekle</button>
+</form>
+
+<hr>
+
+<h2>İşçi Listesi</h2>
+<div id="isciler"></div>
+<h4>Aylık Puantaj PDF</h4>
+<input type="month" id="ay_${id}">
+<button onclick="pdfOlustur('${id}', '${isci.ad}')">PDF Oluştur</button>
+
+<script type="module">
+
+/* ------------------------------------------
+   FIREBASE BAĞLANTI
+------------------------------------------- */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { 
+    getFirestore, collection, addDoc, onSnapshot,
+    deleteDoc, doc, updateDoc, setDoc 
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyD91u6_mbbdbQ7fYpTLM9sCagwpP7tqRls",
+    authDomain: "oryap-puantaj.firebaseapp.com",
+    projectId: "oryap-puantaj",
+    storageBucket: "oryap-puantaj.firebasestorage.app",
+    messagingSenderId: "256704267578",
+    appId: "1:256704267578:web:5e44ea4648aee07fd77c03"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+
+/* ------------------------------------------
+   1) FORM İLE İŞÇİ EKLEME
+------------------------------------------- */
+document.getElementById("isciForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const yeniIsci = {
+        ad: document.getElementById("ad").value,
+        yas: Number(document.getElementById("yas").value),
+        meslek: document.getElementById("meslek").value
+    };
+
+    await addDoc(collection(db, "isciler"), yeniIsci);
+
+    alert("İşçi eklendi!");
+
+    e.target.reset();
+});
+
+
+/* ------------------------------------------
+   2) İŞÇİLERİ LİSTELEME (GERÇEK ZAMANLI)
+------------------------------------------- */
+onSnapshot(collection(db, "isciler"), (snapshot) => {
+    const liste = document.getElementById("isciler");
+    liste.innerHTML = "";
+
+    snapshot.forEach((docu) => {
+        const isci = docu.data();
+        const id = docu.id;
+
+        liste.innerHTML += `
+        <div class="card">
+            <h3>${isci.ad}</h3>
+            <p>Yaş: ${isci.yas}</p>
+            <p>Meslek: ${isci.meslek}</p>
+
+            <button onclick="sil('${id}')">Sil</button>
+            <button onclick="guncelle('${id}', '${isci.ad}')">Güncelle</button>
+
+            <h4>Puantaj Gir</h4>
+            <select id="puan_${id}">
+                <option value="tam">Tam Gün</option>
+                <option value="yarım">Yarım Gün</option>
+                <option value="gelmedi">Gelmedi</option>
+            </select>
+
+            <input type="date" id="tarih_${id}">
+
+            <button onclick="puanEkle('${id}')">Puantaj Kaydet</button>
+        </div>
+        `;
+    });
+});
+
+
+/* ------------------------------------------
+   3) İŞÇİ SİLME
+------------------------------------------- */
+window.sil = async function(id) {
+    await deleteDoc(doc(db, "isciler", id));
+    alert("İşçi silindi!");
+};
+
+
+/* ------------------------------------------
+   4) İŞÇİ GÜNCELLEME
+------------------------------------------- */
+window.guncelle = async function(id, eskiAd) {
+    const yeniAd = prompt("Yeni ad:", eskiAd);
+    if (!yeniAd) return;
+
+    await updateDoc(doc(db, "isciler", id), { ad: yeniAd });
+
+    alert("Güncellendi!");
+};
+
+
+/* ------------------------------------------
+   5) PUANTAJ EKLEME
+------------------------------------------- */
+window.puanEkle = async function(isciID) {
+    const puan = document.getElementById("puan_" + isciID).value;
+    const tarih = document.getElementById("tarih_" + isciID).value;
+
+    if (!tarih) {
+        alert("Lütfen tarih seçin!");
+        return;
+    }
+
+    await setDoc(
+        doc(db, "isciler", isciID, "puantaj", tarih),
+        { puan: puan },
+        { merge: true }
+    );
+
+    alert("Puantaj kaydedildi!");
+};
+
+
+import { getDocs } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+window.aylikPuantaj = async function(isciID, ay) {
+
+    // ay formatı: "2025-01"
+    const puantajRef = collection(db, "isciler", isciID, "puantaj");
+    const snapshot = await getDocs(puantajRef);
+
+    let tam = 0;
+    let yarim = 0;
+    let gelmedi = 0;
+
+    snapshot.forEach(docu => {
+        const tarih = docu.id; // örn: "2025-01-15"
+        const kayit = docu.data();
+
+        if (tarih.startsWith(ay)) {
+            if (kayit.puan === "tam") tam++;
+            if (kayit.puan === "yarım") yarim++;
+            if (kayit.puan === "gelmedi") gelmedi++;
+        }
+    });
+
+    return { tam, yarim, gelmedi };
+};
+
+
+window.puantajPDF = async function(isciID, isciAd, ay) {
+
+    const { jsPDF } = window.jspdf;
+
+    const rapor = await aylikPuantaj(isciID, ay);
+
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.text("Aylık Puantaj Raporu", 10, 20);
+
+    doc.setFontSize(12);
+    doc.text(`İşçi: ${isciAd}`, 10, 40);
+    doc.text(`Ay: ${ay}`, 10, 50);
+
+    doc.text("Toplamlar:", 10, 70);
+    doc.text(`Tam Gün : ${rapor.tam}`, 10, 80);
+    doc.text(`Yarım Gün : ${rapor.yarim}`, 10, 90);
+    doc.text(`Gelmedi : ${rapor.gelmedi}`, 10, 100);
+
+    doc.save(`Puantaj_${isciAd}_${ay}.pdf`);
+};
+
+
+window.pdfOlustur = async function(id, ad) {
+    const ay = document.getElementById("ay_" + id).value;
+
+    if (!ay) {
+        alert("Lütfen bir ay seçin!");
+        return;
+    }
+
+    await puantajPDF(id, ad, ay);
+};
+
+</script>
+
+</body>
+</html>
