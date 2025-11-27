@@ -1,52 +1,194 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Oryap Puantaj Sistemi</title>
-    <style>
-        body { font-family: Arial; padding: 20px; }
-        .card { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
-        input, select { padding: 5px; margin: 5px; }
-    </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Puantaj Sistemi</title>
+
+<style>
+    body { font-family: Arial; padding: 20px; }
+
+    .baslikRow {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .puantajBaslik {
+        font-size: 26px;
+        font-weight: bold;
+    }
+
+    .tarih {
+        font-size: 26px;
+        font-weight: bold;
+    }
+
+    /* İşçi ekleme kutusu */
+    .isciEkleBox {
+        border: 3px solid #000;
+        padding: 15px;
+        border-radius: 15px;
+        width: 300px;
+        margin-top: 25px;
+    }
+
+    .isciEkleBox input {
+        width: 90%;
+        padding: 10px;
+        margin-bottom: 10px;
+        font-size: 18px;
+    }
+
+    .isciEkleBtn {
+        padding: 10px 20px;
+        font-size: 18px;
+        font-weight: bold;
+        background: #66b3ff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 10px;
+        width: 100%;
+    }
+
+    /* İşçi satırı */
+    .isciSatir {
+        display: flex;
+        align-items: center;
+        margin-top: 25px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 15px;
+    }
+
+    .isciKart {
+        border: 3px solid black;
+        padding: 20px 30px;
+        border-radius: 20px;
+        width: 200px;
+        font-size: 28px;
+        font-weight: bold;
+        text-align: center;
+        margin-right: 40px;
+    }
+
+    .puantajBtn {
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-size: 20px;
+        font-weight: bold;
+        color: white;
+        border: none;
+        cursor: pointer;
+        margin-right: 15px;
+    }
+
+    .tam { background-color: #77dd77; }
+    .yarim { background-color: #66b3ff; }
+    .gelmedi { background-color: #ff4d4d; }
+
+    .silBtn {
+        background-color: black;
+        color: white;
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-size: 18px;
+        margin-left: 20px;
+        cursor: pointer;
+    }
+
+    .ozet {
+        font-size: 18px;
+        font-weight: bold;
+        margin-left: 25px;
+    }
+
+    .aylikBtn {
+        padding: 10px 18px;
+        background: #ffaa00;
+        border: none;
+        color: white;
+        font-size: 18px;
+        border-radius: 10px;
+        margin-left: 15px;
+        cursor: pointer;
+    }
+
+    /* Aylık tablo popup */
+    #aylikPencere {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.7);
+        display: none;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #aylikIcerik {
+        background: white;
+        padding: 20px;
+        width: 350px;
+        border-radius: 15px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+
+    table, th, td {
+        border: 1px solid #000;
+        padding: 5px;
+        text-align: center;
+    }
+
+</style>
 
 </head>
 <body>
 
-<h2>İşçi Ekle</h2>
+<div class="baslikRow">
+    <h2 class="puantajBaslik">PUANTAJ GİRİŞ</h2>
+    <div class="tarih" id="bugunTarihi"></div>
+</div>
 
-<form id="isciForm">
-    <input type="text" id="ad" placeholder="Ad Soyad" required>
-    <input type="number" id="yas" placeholder="Yaş" required>
-    <input type="text" id="meslek" placeholder="Meslek" required>
-    <button type="submit">İşçi Ekle</button>
-</form>
+<!-- İşçi Ekleme -->
+<div class="isciEkleBox">
+    <h3>Yeni İşçi Ekle</h3>
+    <input type="text" id="ad" placeholder="Ad Soyad">
+    <button class="isciEkleBtn" onclick="isciEkle()">Ekle</button>
+</div>
 
 <hr>
 
-<h2>İşçi Listesi</h2>
+<!-- İşçi Listesi -->
 <div id="isciler"></div>
-<h4>Aylık Puantaj PDF</h4>
-<input type="month" id="ay_${id}">
-<button onclick="pdfOlustur('${id}', '${isci.ad}')">PDF Oluştur</button>
+
+<!-- Aylık tablo popup -->
+<div id="aylikPencere">
+    <div id="aylikIcerik">
+        <h3 id="aylikBaslik"></h3>
+        <table id="aylikTablo"></table>
+        <button onclick="kapat()">Kapat</button>
+    </div>
+</div>
 
 <script type="module">
 
-/* ------------------------------------------
-   FIREBASE BAĞLANTI
-------------------------------------------- */
+/* ------------------- Firebase ------------------- */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import { 
     getFirestore, collection, addDoc, onSnapshot,
-    deleteDoc, doc, updateDoc, setDoc 
+    deleteDoc, doc, setDoc, getDocs
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyD91u6_mbbdbQ7fYpTLM9sCagwpP7tqRls",
     authDomain: "oryap-puantaj.firebaseapp.com",
     projectId: "oryap-puantaj",
-    storageBucket: "oryap-puantaj.firebasestorage.app",
+    storageBucket: "oryap-puantaj.appspot.com",
     messagingSenderId: "256704267578",
     appId: "1:256704267578:web:5e44ea4648aee07fd77c03"
 };
@@ -54,168 +196,130 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+/* Bugünün tarihi */
+document.getElementById("bugunTarihi").innerText =
+    new Date().toLocaleDateString("tr-TR");
 
-/* ------------------------------------------
-   1) FORM İLE İŞÇİ EKLEME
-------------------------------------------- */
-document.getElementById("isciForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
+/* ------------ İşçi Ekleme -------------- */
+window.isciEkle = async function() {
+    const ad = document.getElementById("ad").value.trim();
+    if (!ad) return alert("İsim giriniz!");
 
-    const yeniIsci = {
-        ad: document.getElementById("ad").value,
-        yas: Number(document.getElementById("yas").value),
-        meslek: document.getElementById("meslek").value
-    };
-
-    await addDoc(collection(db, "isciler"), yeniIsci);
-
+    await addDoc(collection(db, "isciler"), { ad });
+    document.getElementById("ad").value = "";
     alert("İşçi eklendi!");
-
-    e.target.reset();
-});
-
-
-/* ------------------------------------------
-   2) İŞÇİLERİ LİSTELEME (GERÇEK ZAMANLI)
-------------------------------------------- */
-onSnapshot(collection(db, "isciler"), (snapshot) => {
-    const liste = document.getElementById("isciler");
-    liste.innerHTML = "";
-
-    snapshot.forEach((docu) => {
-        const isci = docu.data();
-        const id = docu.id;
-
-        liste.innerHTML += `
-        <div class="card">
-            <h3>${isci.ad}</h3>
-            <p>Yaş: ${isci.yas}</p>
-            <p>Meslek: ${isci.meslek}</p>
-
-            <button onclick="sil('${id}')">Sil</button>
-            <button onclick="guncelle('${id}', '${isci.ad}')">Güncelle</button>
-
-            <h4>Puantaj Gir</h4>
-            <select id="puan_${id}">
-                <option value="tam">Tam Gün</option>
-                <option value="yarım">Yarım Gün</option>
-                <option value="gelmedi">Gelmedi</option>
-            </select>
-
-            <input type="date" id="tarih_${id}">
-
-            <button onclick="puanEkle('${id}')">Puantaj Kaydet</button>
-        </div>
-        `;
-    });
-});
-
-
-/* ------------------------------------------
-   3) İŞÇİ SİLME
-------------------------------------------- */
-window.sil = async function(id) {
-    await deleteDoc(doc(db, "isciler", id));
-    alert("İşçi silindi!");
 };
 
-
-/* ------------------------------------------
-   4) İŞÇİ GÜNCELLEME
-------------------------------------------- */
-window.guncelle = async function(id, eskiAd) {
-    const yeniAd = prompt("Yeni ad:", eskiAd);
-    if (!yeniAd) return;
-
-    await updateDoc(doc(db, "isciler", id), { ad: yeniAd });
-
-    alert("Güncellendi!");
-};
-
-
-/* ------------------------------------------
-   5) PUANTAJ EKLEME
-------------------------------------------- */
-window.puanEkle = async function(isciID) {
-    const puan = document.getElementById("puan_" + isciID).value;
+/* ------------ Puantaj Kaydet (tarih seçilebilir) ------------- */
+window.puanEkleGun = async function(isciID, puan) {
     const tarih = document.getElementById("tarih_" + isciID).value;
 
-    if (!tarih) {
-        alert("Lütfen tarih seçin!");
-        return;
-    }
+    if (!tarih) return alert("Tarih seç!");
 
     await setDoc(
         doc(db, "isciler", isciID, "puantaj", tarih),
-        { puan: puan },
+        { puan },
         { merge: true }
     );
 
     alert("Puantaj kaydedildi!");
 };
 
+/* ------------ İşçi Sil ------------- */
+window.sil = async function(id) {
+    if (!confirm("İşçiyi silmek istiyor musun?")) return;
 
-import { getDocs } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+    await deleteDoc(doc(db, "isciler", id));
 
-window.aylikPuantaj = async function(isciID, ay) {
+    alert("İşçi silindi!");
+};
 
-    // ay formatı: "2025-01"
-    const puantajRef = collection(db, "isciler", isciID, "puantaj");
-    const snapshot = await getDocs(puantajRef);
+/* ------------ Aylık Tablo Göster ------------- */
+window.aylikGoster = async function(isciID, ad) {
+    const ay = prompt("Ay Seç (YYYY-MM) Örn: 2025-01");
+    if (!ay) return;
 
-    let tam = 0;
-    let yarim = 0;
-    let gelmedi = 0;
+    const ref = collection(db, "isciler", isciID, "puantaj");
+    const snap = await getDocs(ref);
 
-    snapshot.forEach(docu => {
-        const tarih = docu.id; // örn: "2025-01-15"
-        const kayit = docu.data();
+    let gunler = {};
 
+    // 01-31 arası boş tablo
+    for (let i=1; i<=31; i++) {
+        gunler[String(i).padStart(2,"0")] = "-";
+    }
+
+    snap.forEach(d => {
+        const tarih = d.id;  // 2025-01-15
         if (tarih.startsWith(ay)) {
-            if (kayit.puan === "tam") tam++;
-            if (kayit.puan === "yarım") yarim++;
-            if (kayit.puan === "gelmedi") gelmedi++;
+            const gun = tarih.split("-")[2];
+            gunler[gun] = d.data().puan;
         }
     });
 
-    return { tam, yarim, gelmedi };
-};
+    // tabloyu doldur
+    let html = "<tr><th>Gün</th><th>Durum</th></tr>";
 
-
-window.puantajPDF = async function(isciID, isciAd, ay) {
-
-    const { jsPDF } = window.jspdf;
-
-    const rapor = await aylikPuantaj(isciID, ay);
-
-    const doc = new jsPDF();
-
-    doc.setFontSize(18);
-    doc.text("Aylık Puantaj Raporu", 10, 20);
-
-    doc.setFontSize(12);
-    doc.text(`İşçi: ${isciAd}`, 10, 40);
-    doc.text(`Ay: ${ay}`, 10, 50);
-
-    doc.text("Toplamlar:", 10, 70);
-    doc.text(`Tam Gün : ${rapor.tam}`, 10, 80);
-    doc.text(`Yarım Gün : ${rapor.yarim}`, 10, 90);
-    doc.text(`Gelmedi : ${rapor.gelmedi}`, 10, 100);
-
-    doc.save(`Puantaj_${isciAd}_${ay}.pdf`);
-};
-
-
-window.pdfOlustur = async function(id, ad) {
-    const ay = document.getElementById("ay_" + id).value;
-
-    if (!ay) {
-        alert("Lütfen bir ay seçin!");
-        return;
+    for (let g in gunler) {
+        html += `<tr><td>${g}</td><td>${gunler[g]}</td></tr>`;
     }
 
-    await puantajPDF(id, ad, ay);
+    document.getElementById("aylikBaslik").innerText = ad + " - " + ay + " Puantaj";
+    document.getElementById("aylikTablo").innerHTML = html;
+    document.getElementById("aylikPencere").style.display = "flex";
 };
+
+window.kapat = function() {
+    document.getElementById("aylikPencere").style.display = "none";
+};
+
+/* ------------ İşçileri Listele ------------- */
+onSnapshot(collection(db, "isciler"), async (snapshot) => {
+    const liste = document.getElementById("isciler");
+    liste.innerHTML = "";
+
+    for (const docu of snapshot.docs) {
+        const isci = docu.data();
+        const id = docu.id;
+
+        /* Puantaj özetini al */
+        const puantajRef = collection(db, "isciler", id, "puantaj");
+        const pSnap = await getDocs(puantajRef);
+
+        let tam = 0, yarim = 0, gelmedi = 0;
+
+        pSnap.forEach(p => {
+            const durum = p.data().puan;
+            if (durum === "tam") tam++;
+            if (durum === "yarım") yarim++;
+            if (durum === "gelmedi") gelmedi++;
+        });
+
+        liste.innerHTML += `
+        <div class="isciSatir">
+
+            <div class="isciKart">${isci.ad}</div>
+
+            <input type="date" id="tarih_${id}" style="margin-right:10px;">
+
+            <button class="puantajBtn tam" onclick="puanEkleGun('${id}', 'tam')">Tam</button>
+            <button class="puantajBtn yarim" onclick="puanEkleGun('${id}', 'yarım')">Yarım</button>
+            <button class="puantajBtn gelmedi" onclick="puanEkleGun('${id}', 'gelmedi')">Gelmedi</button>
+
+            <div class="ozet">
+                ✔ Tam: ${tam} |
+                ➗ Yarım: ${yarim} |
+                ✖ Gelmedi: ${gelmedi}
+            </div>
+
+            <button class="aylikBtn" onclick="aylikGoster('${id}', '${isci.ad}')">Aylık Tablo</button>
+
+            <button class="silBtn" onclick="sil('${id}')">Sil</button>
+
+        </div>
+        `;
+    }
+});
 
 </script>
 
