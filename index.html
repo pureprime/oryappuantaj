@@ -205,18 +205,18 @@ document.getElementById("bugunTarihi").innerText =
 /* ------------ İşçi Ekleme -------------- */
 window.isciEkle = async function() {
     const ad = document.getElementById("ad").value.trim();
-    if (!ad) return alert("İsim giriniz!");
+    if (!ad) return showAlert("İsim giriniz!", "warning");
 
     await addDoc(collection(db, "isciler"), { ad });
     document.getElementById("ad").value = "";
-    alert("İşçi eklendi!");
+   showAlert("İşçi başarıyla eklendi!", "success");
 };
 
 /* ------------ Puantaj Kaydet (tarih seçilebilir) ------------- */
 window.puanEkleGun = async function(isciID, puan) {
     const tarih = document.getElementById("tarih_" + isciID).value;
 
-    if (!tarih) return alert("Tarih seç!");
+    if (!tarih) return showAlert("Tarih seç!","warning");
 
     await setDoc(
         doc(db, "isciler", isciID, "puantaj", tarih),
@@ -224,7 +224,8 @@ window.puanEkleGun = async function(isciID, puan) {
         { merge: true }
     );
 
-    alert("Puantaj kaydedildi!");
+ showAlert("Puantaj kaydedildi.", "info");
+
 };
 
 /* ------------ İşçi Sil ------------- */
@@ -233,7 +234,8 @@ window.sil = async function(id) {
 
     await deleteDoc(doc(db, "isciler", id));
 
-    alert("İşçi silindi!");
+  showAlert("İşçi silindi!", "danger");
+
 };
 
 /* ------------ Aylık Tablo Göster ------------- */
@@ -348,4 +350,5 @@ window.showAlert = function(message, type = "success") {
 
 </body>
 </html>
+
 
